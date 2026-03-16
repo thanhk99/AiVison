@@ -31,6 +31,9 @@ Dự án AI Home Assistant (Quản gia Thành) là một hệ thống trợ lý 
 3. **Cấu hình:**
    Mở file `config.yaml` để chỉnh sửa các thông số như `camera_id` hoặc đường dẫn tới các model.
 
+> [!IMPORTANT]
+> **Lưu ý về Model:** Các file model nặng (`.onnx`, `.task`) không được bao gồm trong kho lưu trữ Git để giảm dung lượng. Bạn cần tự tải hoặc sao chép các file này vào thư mục `models/` tương ứng (TTS và Vision) trước khi chạy hệ thống.
+
 ## 📖 Hướng dẫn sử dụng
 
 ### 1. Đăng ký thông tin người dùng

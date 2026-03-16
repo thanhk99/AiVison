@@ -38,6 +38,9 @@ logs/
 pip_log.txt
 config_local.yaml
 
-# AI Models & Data (Keep directory structure but ignore content)
+# AI Models & Data (Ignore heavy model files)
+models/**/*.onnx
+models/**/*.task
+models/**/*.onnx.json
 models/vision/faces/*
 !models/vision/faces/.gitkeep
