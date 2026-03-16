@@ -56,6 +56,7 @@ class VisionEngine:
         self.required_frames = 6 
         self.lost_hand_count = 0 
         self.max_lost_frames = 15 
+        self.last_key = -1  # Lưu phím bấm cuối cùng
 
     def start(self):
         """Bắt đầu luồng nhận diện camera."""
@@ -180,6 +181,7 @@ class VisionEngine:
                 cv2.imshow("AI Home Assistant Vision", img)
                 
                 key = cv2.waitKey(1) & 0xFF
+                self.last_key = key # Lưu lại để MainAssistant truy cập
                 if key == ord('q'):
                     self.running = False
                     break
@@ -242,6 +244,12 @@ class VisionEngine:
 
     def get_current_gesture(self):
         return self.current_gesture
+
+    def get_last_key(self):
+        """Lấy phím bấm gần nhất và reset nó."""
+        key = self.last_key
+        self.last_key = -1
+        return key
 
 if __name__ == "__main__":
     # Cấu hình logging để thấy output trong console

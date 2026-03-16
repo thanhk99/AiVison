@@ -66,46 +66,66 @@ class MainAssistant:
         self._audio_thread = threading.Thread(target=self._run_audio_loop, daemon=True)
         self._audio_thread.start()
         
-        logger.info("[V] Quan gia Thanh da san sang. Hay ra hieu 'CALL' de bat dau.")
+        logger.info("[V] Quan gia Thanh da san sang. Nhan 'S' de xac minh, 'L' de khoa.")
         
         try:
             while self.is_running:
-                # Main logic loop for gesture and security coordination
-                current_gesture = self.vision.get_current_gesture()
+                # 1. Lay phim bam tu Vision Engine
+                key = self.vision.get_last_key()
                 
-                if current_gesture == "CALL (Bat_dau)":
+                if key == ord('s') or key == ord('S'):
                     if not self.is_unlocked and not self.is_authenticating:
                         self._handle_authentication()
                 
-                elif current_gesture == "BAN_TAY (Huy)":
+                elif key == ord('l') or key == ord('L'):
                     if self.is_unlocked:
                         self._lock_system()
                 
-                time.sleep(0.1)
+                time.sleep(0.05)
         except KeyboardInterrupt:
             self.stop()
 
     def _handle_authentication(self):
-        """Thực hiện xác thực khuôn mặt khi có cử chỉ CALL."""
+        """Thực hiện xác thực khuôn mặt khi nhấn phím S, tối đa 3 lần."""
         self.is_authenticating = True
-        logger.info(">>> Dang tien hanh xac thuc khuon mat...")
+        logger.info(">>> Bat dau qua trinh xac thuc khuon mat...")
         
-        # Lấy frame từ vision engine (camera đang mở)
-        if self.vision.cap:
-            ret, frame = self.vision.cap.read()
-            if ret:
-                user = self.security.authenticate(frame)
-                if user != "Unknown" and user != "Guest":
-                    self.is_unlocked = True
-                    self.current_user = user
-                    info = self.security.get_user_info()
-                    msg = f"Chào {user}, Quản gia Thành đã sẵn sàng phục vụ. Bạn đang cảm thấy {info['emotion']} phải không?"
-                    logger.info(f"[SEC] {msg}")
-                    # Bỏ phần chào của hệ thống bằng giọng nói, chỉ hiển thị thôi
+        attempts = 0
+        max_attempts = 3
+        success = False
+
+        while attempts < max_attempts and not success:
+            attempts += 1
+            logger.info(f"--- Lan thu {attempts}/{max_attempts} ---")
+            
+            # Đợi camera lấy frame ổn định (thử tối đa 10 frame)
+            user = "Unknown"
+            for _ in range(10):
+                if self.vision.cap:
+                    ret, frame = self.vision.cap.read()
+                    if ret:
+                        user = self.security.authenticate(frame)
+                        if user != "Unknown" and user != "Guest":
+                            success = True
+                            self.is_unlocked = True
+                            self.current_user = user
+                            info = self.security.get_user_info()
+                            msg = f"Chào mừng {user}, Quản gia Thành đã sẵn sàng phục vụ. Bạn đang cảm thấy {info['emotion']} phải không?"
+                            logger.info(f"[SEC] {msg}")
+                            self.voice.speak(msg)
+                            break
+                time.sleep(0.1)
+
+            if not success:
+                if attempts < max_attempts:
+                    msg = f"Xác minh thất bại lần {attempts}. Vui lòng thử lại."
+                    logger.warning(f"[SEC] {msg}")
+                    self.voice.speak(msg)
+                    time.sleep(2) # Đợi một chút trước khi thử lại
                 else:
-                    self.voice.speak("Xin lỗi, tôi không nhận diện được bạn. Vui lòng thử lại hoặc đăng ký khuôn mặt.")
-            else:
-                logger.error("Khong lay duoc frame tu camera de xac thuc.")
+                    msg = "Xác minh thất bại quá 3 lần. Hệ thống sẽ tiếp tục khóa."
+                    logger.error(f"[SEC] {msg}")
+                    self.voice.speak(msg)
         
         self.is_authenticating = False
 
@@ -115,7 +135,7 @@ class MainAssistant:
         self.current_user = "Unknown"
         self.security.reset()
         logger.info("<<< He thong da KHOA.")
-        self.voice.speak("Tạm biệt bạn, tôi sẽ quay lại trạng thái chờ.")
+        self.voice.speak("Tạm biệt bạn, tôi đã khóa hệ thống và quay lại trạng thái chờ.")
 
     def _run_audio_loop(self):
         """Vòng lặp xử lý âm thanh thời gian thực."""

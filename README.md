@@ -50,13 +50,13 @@ python main.py
 ```
 
 ### 3. Tương tác với Quản gia Thành
-Hệ thống hoạt động dựa trên các cử chỉ tay (Gesture):
-- 🤙 **CALL (Ngón cái + Ngón út):** Kích hoạt hệ thống. Thành sẽ kiểm tra khuôn mặt của bạn, nếu đúng chủ nhân sẽ bắt đầu lắng nghe.
-- 🖐️ **BAN_TAY (Xòe 5 ngón):** Khóa hệ thống. Thành sẽ chào tạm biệt và quay về trạng thái chờ.
-- ✊ **NAM_TAY:** Xác nhận thực thi lệnh.
-- ☝️ **1 NGÓN:** Di chuyển về phía trước / Lệnh phụ.
-- ✌️ **2 NGÓN:** Chuyển sang nội dung tiếp theo.
-- 🖕 **NGÓN GIỮA:** Yêu cầu AI im lặng ngay lập tức.
+Hệ thống hoạt động dựa trên phím bấm và giọng nói:
+- ⌨️ Phím **'S'**: Bắt đầu xác thực khuôn mặt. Bạn có tối đa 3 lần thử.
+- 🔓 Sau khi xác thực thành công: Bạn có thể bắt đầu trò chuyện bằng giọng nói với Thành.
+- ⌨️ Phím **'L'**: Rời khỏi nhà và khóa AI. Thành sẽ chào tạm biệt và ngừng lắng nghe.
+
+### 🖖 Cử chỉ tay (Hỗ trợ khi đã mở khóa)
+- 🖐️ **BAN_TAY:** Yêu cầu AI im lặng ngay lập tức.
 
 ## 📁 Cấu trúc dự án
 - `engines/`: Chứa các bộ xử lý Vision (DeepFace, MediaPipe), Voice (Ollama, Whisper, Piper).
