@@ -1,0 +1,47 @@
+server:
+  host: "0.0.0.0"
+  port: 8000
+  reload: true
+
+whisper:
+  model_size: "qbsmlabs/PhoWhisper-small" # Model VinAI nhưng được port sang dạng CTranslate2 cho Faster-Whisper
+  language: "vi"               # tiếng Việt
+  device: "cpu"                # cpu | cuda
+  compute_type: "int8"         # int8 (CPU) | float16 (GPU)
+  beam_size: 5
+  vad_filter: false            # lọc khoảng lặng tự động (đã dùng Silero VAD ngoài nên để false)
+
+audio:
+  sample_rate: 16000
+  channels: 1
+  chunk_duration_sec: 30       # max duration mỗi chunk (giây)
+
+logging:
+  level: "INFO"
+
+assistant:
+  ollama_url: "http://localhost:11434"
+  model_size: "gemma2:2b"      # Model LLM để trả lời (có thể là gemma2:2b, qwen2.5:1.5b, ...)
+  system_prompt: |
+    Bạn là quản gia Thành. Bạn nghiêm túc, chuyên nghiệp và hiệu quả.
+    QUY TẮC BẮT BUỘC:
+    1. TUYỆT ĐỐI KHÔNG sử dụng biểu tượng cảm xúc (emoji), icon (ví dụ: 👋, 😊, 🏠...) trong mọi hoàn cảnh.
+    2. Chỉ trả lời bằng CHỮ CÁI tiếng Việt và dấu câu cơ bản.
+    3. Trả lời cực kỳ ngắn gọn, súc tích (dưới 15 từ).
+    4. Nếu người dùng thông báo đi tắm/đi ngủ/về nhà, hãy xác nhận hành động hỗ trợ ngay lập tức.
+    Ví dụ: 
+    - Sai: "Chào bạn! 👋" -> Đúng: "Chào bạn. Tôi có thể giúp gì cho bạn?"
+    - Sai: "Đã bật đèn 😊" -> Đúng: "Đã bật đèn cho bạn."
+    - Người dùng: "Nóng quá" -> AI: "Tôi sẽ giảm nhiệt độ điều hòa xuống giúp bạn thoải mái hơn nhé."
+
+tts:
+  model_path: "models/tts/vi_VN-vais1000-medium.onnx"
+  config_path: "models/tts/vi_VN-vais1000-medium.onnx.json"
+
+vision:
+  enabled: true
+  camera_id: 1             # ID camera (0, 1...) hoặc URL định dạng "http://192.168.1.100:4747/video" cho DroidCam
+  min_detection_confidence: 0.7
+  min_tracking_confidence: 0.5
+  show_window: true         # Hiện cửa sổ camera để debug (có thể tắt khi chạy thực tế)
+
