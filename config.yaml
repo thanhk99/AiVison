@@ -45,3 +45,15 @@ vision:
   min_tracking_confidence: 0.5
   show_window: true         # Hiện cửa sổ camera để debug (có thể tắt khi chạy thực tế)
 
+mqtt:
+  enabled: true
+  broker: "localhost"
+  port: 1883
+  user: ""
+  password: ""
+  client_id: "ai_assistant"
+  topics:
+    command: "home/assistant/command"
+    status: "home/assistant/status"
+    event: "home/assistant/event"
+

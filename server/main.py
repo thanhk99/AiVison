@@ -2,9 +2,10 @@ import logging
 import time
 from contextlib import asynccontextmanager
 from pathlib import Path
+import threading
 
 import yaml
-from fastapi import FastAPI, File, HTTPException, UploadFile, WebSocket
+from fastapi import FastAPI, File, HTTPException, UploadFile, WebSocket, Query
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 
@@ -25,22 +26,29 @@ CONFIG = load_config()
 
 # ─── Khởi tạo engine (load 1 lần lúc startup) ────────────────────────────────
 engine: WhisperEngine = None
+assistant = None # Sẽ được set từ main.py khi khởi chạy tích hợp
 
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     global engine
-    logger.info("Đang khởi động STT Server...")
-    engine = WhisperEngine(config=CONFIG.get("whisper"))
+    logger.info("Đang khởi động API Server...")
+    try:
+        # Load engine nếu cấu hình whisper có sẵn
+        whisper_cfg = CONFIG.get("whisper")
+        if whisper_cfg:
+            engine = WhisperEngine(config=whisper_cfg)
+    except Exception as e:
+        logger.error(f"Lỗi load Whisper engine: {e}")
     yield
-    logger.info("STT Server dừng.")
+    logger.info("API Server dừng.")
 
 
 # ─── FastAPI App ──────────────────────────────────────────────────────────────
 app = FastAPI(
-    title="Home Assistance STT API",
-    description="Nhận diện giọng nói tiếng Việt offline - Powered by Faster-Whisper",
-    version="1.0.0",
+    title="Home Assistance API",
+    description="API điều khiển Quản gia AI - STT & Control Hub",
+    version="1.1.0",
     lifespan=lifespan,
 )
 
@@ -56,16 +64,66 @@ app.add_middleware(
 
 @app.get("/health", summary="Kiểm tra trạng thái server")
 async def health():
-    return {"status": "ok", "model_ready": engine is not None}
+    return {
+        "status": "ok", 
+        "model_ready": engine is not None, 
+        "assistant_connected": assistant is not None
+    }
 
+# ─── Assistant Control Endpoints ─────────────────────────────────────────────
+
+@app.get("/status", summary="Lấy trạng thái Quản gia AI")
+async def get_status():
+    if assistant is None:
+        raise HTTPException(status_code=503, detail="Assistant chưa được kết nối")
+    
+    return {
+        "is_unlocked": assistant.is_unlocked,
+        "current_user": assistant.current_user,
+        "is_authenticating": assistant.is_authenticating,
+        "vision_active": assistant.vision.is_running if assistant.vision else False
+    }
+
+
+@app.post("/control", summary="Điều khiển hệ thống (lock/unlock)")
+async def control_assistant(action: str = Query(..., description="lock hoặc unlock")):
+    if assistant is None:
+        raise HTTPException(status_code=503, detail="Assistant chưa được kết nối")
+    
+    action = action.lower()
+    if action == "lock":
+        # Khóa ngay lập tức
+        assistant._lock_system()
+        return {"message": "Đã khóa hệ thống"}
+    elif action == "unlock":
+        if not assistant.is_unlocked:
+             # Logic unlock: Kích hoạt camera hoặc log request
+             logger.info("API: Nhận yêu cầu mở khóa hệ thống")
+             # assistant._handle_authentication() 
+             return {"message": "Hệ thống đang sẵn sàng xử lý mở khóa"}
+        return {"message": "Hệ thống đã mở khóa từ trước"}
+    else:
+        raise HTTPException(status_code=400, detail="Hành động không hợp lệ. Sử dụng 'lock' hoặc 'unlock'")
+
+
+@app.post("/command", summary="Gửi lệnh văn bản cho AI")
+async def send_command(text: str = Query(..., description="Nội dung lệnh thoại")):
+    if assistant is None:
+        raise HTTPException(status_code=503, detail="Assistant chưa được kết nối")
+    
+    logger.info(f"API Received Code: {text}")
+    # Xử lý lệnh như một câu thoại thông qua Voice Engine
+    # Sử dụng threading để không block event loop của FastAPI
+    threading.Thread(target=assistant.voice.process_text_command, args=(text,), daemon=True).start()
+    return {"message": f"Đã nhận lệnh: {text}"}
+
+
+# ─── STT Endpoints ───────────────────────────────────────────────────────────
 
 @app.post("/transcribe", summary="Nhận diện giọng nói từ file audio")
 async def transcribe(audio: UploadFile = File(...)):
-    """
-    Upload file audio (wav, mp3, ogg, m4a, ...) và nhận về văn bản tiếng Việt.
-    """
     if engine is None:
-        raise HTTPException(status_code=503, detail="Model chưa sẵn sàng")
+        raise HTTPException(status_code=503, detail="Model STT chưa được load")
 
     content = await audio.read()
     if len(content) == 0:
@@ -87,44 +145,9 @@ async def transcribe(audio: UploadFile = File(...)):
         raise HTTPException(status_code=500, detail=str(e))
 
 
-@app.post("/transcribe/bytes", summary="Nhận diện từ raw bytes PCM float32")
-async def transcribe_bytes(audio: UploadFile = File(...)):
-    """
-    Nhận raw PCM float32 16kHz mono bytes, trả về text.
-    Dùng khi client đã có numpy array và muốn gửi trực tiếp.
-    """
-    import numpy as np
-
-    if engine is None:
-        raise HTTPException(status_code=503, detail="Model chưa sẵn sàng")
-
-    content = await audio.read()
-    if len(content) == 0:
-        raise HTTPException(status_code=400, detail="Dữ liệu rỗng")
-
-    try:
-        start = time.perf_counter()
-        audio_array = np.frombuffer(content, dtype=np.float32)
-        result = engine.transcribe(audio_array)
-        elapsed = round(time.perf_counter() - start, 3)
-
-        return JSONResponse({
-            "success": True,
-            "processing_time_sec": elapsed,
-            **result,
-        })
-    except Exception as e:
-        logger.error(f"Lỗi transcribe_bytes: {e}")
-        raise HTTPException(status_code=500, detail=str(e))
-
-
 @app.websocket("/stream")
 async def websocket_stream(websocket: WebSocket):
-    """
-    WebSocket endpoint nhận audio stream PCM float32 realtime.
-    Client gửi bytes từng chunk, gửi b'END' để kết thúc.
-    """
     if engine is None:
-        await websocket.close(code=1011, reason="Model chưa sẵn sàng")
+        await websocket.close(code=1011, reason="Model STT chưa được load")
         return
     await stream_transcribe(websocket, engine)

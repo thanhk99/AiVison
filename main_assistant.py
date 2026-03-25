@@ -78,7 +78,10 @@ class MainAssistant:
                         self._handle_authentication()
                 
                 elif current_gesture == "BAN_TAY (Huy)":
-                    if self.is_unlocked:
+                    if self.voice.tts.is_speaking:
+                        logger.info("[Vision] Phat hien cu chi BAN_TAY - Dung AI noi.")
+                        self.voice.stop_speaking()
+                    elif self.is_unlocked:
                         self._lock_system()
                 
                 time.sleep(0.1)

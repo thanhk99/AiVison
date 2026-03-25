@@ -4,7 +4,6 @@ from typing import Generator
 import numpy as np
 from engines.stt.whisper_engine import WhisperEngine
 from engines.llm.llm_engine import LLMEngine
-from engines.tts.tts_engine import TTSEngine
 
 logger = logging.getLogger("VoiceEngine")
 
@@ -26,14 +25,8 @@ class VoiceEngine:
         )
         self.llm.system_prompt = llm_conf.get("system_prompt", "")
         
-        # 3. Piper TTS
-        tts_conf = config.get("tts", {})
-        self.tts = TTSEngine(
-            model_path=tts_conf.get("model_path"),
-            config_path=tts_conf.get("config_path")
-        )
         
-        logger.info("Voice Engine da san sang.")
+        logger.info("Voice Engine da san sang (Khong su dung TTS).")
 
     def transcribe(self, audio_data: np.ndarray) -> str:
         """Chuyen doi am thanh sang van ban."""
@@ -45,15 +38,12 @@ class VoiceEngine:
         return self.llm.generate_response_stream(text)
 
     def speak(self, text: str, async_mode: bool = True):
-        """Phat am thanh tu van ban."""
-        if async_mode:
-            self.tts.speak_async(text)
-        else:
-            self.tts.speak(text)
+        """Phat am thanh tu van ban. (Đã bị vô hiệu hóa)"""
+        pass
 
     def stop_speaking(self):
-        """Dung phát thanh ngay lap tuc."""
-        self.tts.stop()
+        """Dung phát thanh ngay lap tuc. (Đã bị vô hiệu hóa)"""
+        pass
 
     def process_voice_command(self, audio_data: np.ndarray):
         """
@@ -72,6 +62,21 @@ class VoiceEngine:
             print(chunk, end="", flush=True)
             full_response += chunk
         print("\n")
+        
+        if full_response:
+            self.speak(full_response)
+            
+        return full_response
+    def process_text_command(self, text: str):
+        """Xử lý lệnh thoại từ văn bản (STT bỏ qua)."""
+        if not text:
+            return None
+            
+        logger.info(f"[API/MQTT] {text}")
+        
+        full_response = ""
+        for chunk in self.generate_response(text):
+            full_response += chunk
         
         if full_response:
             self.speak(full_response)

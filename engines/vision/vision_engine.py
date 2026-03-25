@@ -44,6 +44,7 @@ class VisionEngine:
         self.mp_draw = None # MediaPipe Tasks khong di kem drawing utils don gian nhu solutions
         
         self.current_gesture = None
+        self.current_frame = None
         self.cap = None
         self.running = False
         self.thread = None
@@ -134,8 +135,11 @@ class VisionEngine:
                 logger.warning("Khong thể đọc dữ liệu từ camera. Dang thu lai...")
                 time.sleep(1)
                 continue
+                
+            self.current_frame = img.copy()
 
             # Chuyển sang RGB cho MediaPipe và tạo MediaPipe Image
+
             img_rgb = cv2.cvtColor(img, cv2.COLOR_BGR2RGB)
             mp_image = mp.Image(image_format=mp.ImageFormat.SRGB, data=img_rgb)
             
@@ -175,22 +179,25 @@ class VisionEngine:
                 cv2.putText(img, f"GESTURE: {self.current_gesture}", (10, 30), 
                             cv2.FONT_HERSHEY_SIMPLEX, 0.7, (0, 255, 0), 2)
                 
-                cv2.putText(img, "CALL: Bat dau | BAN_TAY: Huy | NAM_TAY: Thuc thi", (10, 465), 
+                cv2.putText(img, "BAN_TAY: Huy | NAM_TAY: Thuc thi", (10, 465), 
                             cv2.FONT_HERSHEY_SIMPLEX, 0.5, (255, 255, 255), 1)
 
                 cv2.imshow("AI Home Assistant Vision", img)
                 
                 key = cv2.waitKey(1) & 0xFF
-                self.last_key = key # Lưu lại để MainAssistant truy cập
-                if key == ord('q'):
-                    self.running = False
-                    break
+                if key != 255:
+                    self.last_key = key # Lưu lại để MainAssistant truy cập
+
                 elif key == ord('n') and isinstance(self.camera_id, int):
                     self.cap.release()
                     self.camera_id = (self.camera_id + 1) % 3
                     self.cap = self._open_camera(self.camera_id)
 
         self.stop()
+
+    def get_frame(self):
+        """Trả về frame mới nhất đọc từ camera."""
+        return self.current_frame
 
     def _get_gesture(self, hand_landmarks):
         """
@@ -226,11 +233,7 @@ class VisionEngine:
         if total_open == 0:
             return "NAM_TAY (Thuc_thi)"
 
-        # 3. CALL (Ngón cái + Ngón út) -> Kích hoạt
-        if thumb_open and pnk and not idx and not mid and not ring:
-            return "CALL (Bat_dau)"
-
-        # 4. CÁC LỆNH ĐIỀU HƯỚNG (Khi đang lắng nghe)
+        # 3. CÁC LỆNH ĐIỀU HƯỚNG (Khi đang lắng nghe)
         if idx and total_open == 1:
             return "MOT_NGON (Ve_truoc)"
             
