@@ -31,6 +31,34 @@ def main():
     
     face_mgr = FaceManager()
     
+    print("Chọn phương thức đăng ký:")
+    print("1. Sử dụng Camera")
+    print("2. Chọn ảnh từ máy tính")
+    choice = input("Nhập lựa chọn (1/2, mặc định 1): ").strip()
+
+    if choice == '2':
+        import tkinter as tk
+        from tkinter import filedialog
+        root = tk.Tk()
+        root.withdraw() # Ẩn cửa sổ chính của tkinter
+        file_path = filedialog.askopenfilename(
+            title="Chọn ảnh để đăng ký",
+            filetypes=[("Image files", "*.jpg *.jpeg *.png *.bmp")]
+        )
+        root.destroy()
+
+        if not file_path:
+            print("Đã hủy chọn ảnh.")
+            return
+
+        print(f"Đang xử lý ảnh: {file_path}...")
+        success, message = face_mgr.register_face(name, image_path=file_path)
+        if success:
+            print(f"Thành công: {message}")
+        else:
+            print(f"Thất bại: {message}")
+        return
+
     # Mở camera (hỗ trợ cả ID số hoặc link DroidCam)
     if isinstance(camera_id, str) and camera_id.startswith("http"):
         cap = cv2.VideoCapture(camera_id)

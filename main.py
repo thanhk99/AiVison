@@ -105,6 +105,28 @@ class MainAssistant:
     def _gui_run_face_registration(self):
         name = simpledialog.askstring("Đăng Ký", "Nhập tên người dùng mới:", parent=self.root)
         if name and name.strip():
+            # Hỏi phương thức đăng ký
+            from tkinter import messagebox, filedialog
+            use_file = messagebox.askyesno("Phương thức đăng ký", 
+                                           f"Bạn có muốn chọn ảnh từ máy tính cho '{name}' không?\n(Nhấn No để sử dụng Camera)", 
+                                           parent=self.root)
+            
+            if use_file:
+                file_path = filedialog.askopenfilename(
+                    title=f"Chọn ảnh để đăng ký {name}",
+                    filetypes=[("Image files", "*.jpg *.jpeg *.png *.bmp")],
+                    parent=self.root
+                )
+                if file_path:
+                    from engines.vision.face_manager import FaceManager
+                    face_mgr = FaceManager()
+                    ok, msg = face_mgr.register_face(name.strip(), image_path=file_path)
+                    if ok:
+                        messagebox.showinfo("Thành công", msg)
+                    else:
+                        messagebox.showerror("Thất bại", msg)
+                return
+
             self.root.withdraw()
             self._run_face_registration(name.strip())
             self.root.deiconify()
