@@ -44,6 +44,10 @@ vision:
   min_detection_confidence: 0.7
   min_tracking_confidence: 0.5
   show_window: true         # Hiện cửa sổ camera để debug (có thể tắt khi chạy thực tế)
+  face_model: "ArcFace"
+  face_detector: "opencv"
+  face_threshold: 0.35
+  anti_spoofing: true
 
 mqtt:
   enabled: true
