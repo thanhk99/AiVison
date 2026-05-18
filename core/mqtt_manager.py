@@ -102,6 +102,7 @@ class MqttManager:
             if isinstance(payload, (dict, list)):
                 payload = json.dumps(payload, ensure_ascii=False)
             
+            # print(f"[MQTT SEND] Topic: {topic} | Payload: {payload}")
             self.client.publish(topic, payload, qos=1)
             # logger.debug(f"Published to {topic}: {payload}")
         except Exception as e:

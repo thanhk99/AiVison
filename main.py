@@ -58,6 +58,7 @@ class MainAssistant:
         self.current_user = "Unknown"
         self.is_running = False
         self.is_authenticating = False
+        self.last_gesture = None
         
         # 4. MQTT Manager
         self.mqtt = MqttManager(self.config)
@@ -257,6 +258,30 @@ class MainAssistant:
         
         try:
             while self.is_running:
+                 # ===== 1. GESTURE =====
+                gesture = self.vision.get_current_gesture()
+
+                if gesture and gesture != "None":
+                    if gesture != self.last_gesture:
+                        self.last_gesture = gesture
+
+                        print(f"[GESTURE] {gesture}")
+
+                        if "NAM_TAY" in gesture:
+                            print("gui lenh bat den")
+                            self.mqtt.publish("iot", {
+                                "device": "light",
+                                "action": "on"
+                            })
+
+                        elif "BAN_TAY" in gesture:
+                            print("gui lenh tat den")
+                            self.mqtt.publish("iot", {
+                                "device": "light",
+                                "action": "off"
+                            })
+                
+                # ===== 2. KEY =====
                 # 1. Lấy phím bấm từ Vision Engine
                 key = self.vision.get_last_key()
                 
@@ -390,10 +415,10 @@ class MainAssistant:
                 self._lock_system()
         elif "bật đèn" in command:
              # Vi du ve event
-             self.mqtt.publish_event("iot_control", {"device": "light", "action": "on"})
+             self.mqtt.publish("iot", {"device": "light", "action": "on"})
              self.voice.speak("Đã bật đèn cho bạn.")
         elif "tắt đèn" in command:
-             self.mqtt.publish_event("iot_control", {"device": "light", "action": "off"})
+             self.mqtt.publish("iot", {"device": "light", "action": "off"})
              self.voice.speak("Đã tắt đèn cho bạn.")
 
     def _start_api_server(self):

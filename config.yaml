@@ -40,7 +40,7 @@ tts:
 
 vision:
   enabled: true
-  camera_id: 1             # ID camera (0, 1...) hoặc URL định dạng "http://192.168.1.100:4747/video" cho DroidCam
+  camera_id: 0             # ID camera (0, 1...) hoặc URL định dạng "http://192.168.1.100:4747/video" cho DroidCam
   min_detection_confidence: 0.7
   min_tracking_confidence: 0.5
   show_window: true         # Hiện cửa sổ camera để debug (có thể tắt khi chạy thực tế)
@@ -60,4 +60,5 @@ mqtt:
     command: "home/assistant/command"
     status: "home/assistant/status"
     event: "home/assistant/event"
+    iot: "home/assistant/control"
 
