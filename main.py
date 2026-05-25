@@ -58,6 +58,7 @@ class MainAssistant:
         self.current_user = "Unknown"
         self.is_running = False
         self.is_authenticating = False
+        self.is_session_active = False  # Trạng thái phiên hội thoại
         self.last_gesture = None
         
         # 4. MQTT Manager
@@ -72,7 +73,7 @@ class MainAssistant:
         """Hiển thị menu chính bằng Tkinter GUI."""
         self.root = tk.Tk()
         self.root.title("QUẢN GIA THÀNH AI - PANEL")
-        self.root.geometry("450x300")
+        self.root.geometry("450x380")
         self.root.configure(bg="#f0f4f8")
         
         # Center window
@@ -318,19 +319,46 @@ class MainAssistant:
         self.voice.speak("Tạm biệt bạn, tôi đã khóa hệ thống và quay lại trạng thái chờ.")
         cv2.destroyAllWindows()
 
+    def _start_session(self):
+        """Bắt đầu phiên giao tiếp sau khi nghe wake word."""
+        self.is_session_active = True
+        self.voice.llm.clear_history()
+        logger.info("[SESSION] Phiên giao tiếp bắt đầu.")
+        self.voice.speak("Dạ, tôi đang nghe. Bạn cần gì ạ?")
+
+    def _end_session(self):
+        """Kết thúc phiên giao tiếp."""
+        self.is_session_active = False
+        logger.info("[SESSION] Phiên giao tiếp kết thúc.")
+        self.voice.llm.clear_history()
+
+    def _handle_command(self, command: str):
+        """Điều phối lệnh từ LLM tới IoT hoặc Software."""
+        if not command or command == "NONE":
+            return
+        if command.startswith("IOT:"):
+            logger.info(f"[CMD] Gửi IoT command: {command}")
+            self.mqtt.publish("iot", {"command": command})
+        elif command.startswith("SW:"):
+            logger.info(f"[CMD] Software command: {command}")
+        else:
+            logger.warning(f"[CMD] Lệnh không xác định: {command}")
+
     def _run_audio_loop(self):
         """Vòng lặp xử lý âm thanh thời gian thực."""
+        input_device_index = self.config.get("audio", {}).get("device_index", -1)
+        if input_device_index < 0:
+            input_device_index = None
+            
         self.stream = self.p.open(
             format=FORMAT,
             channels=CHANNELS,
             rate=SAMPLE_RATE,
             input=True,
-            frames_per_buffer=CHUNK
+            frames_per_buffer=CHUNK,
+            input_device_index=input_device_index
         )
 
-        audio_buffer = []
-        silence_chunks = 0
-        is_speaking = False
         audio_buffer = []
         silence_chunks = 0
         is_speaking = False
@@ -348,6 +376,14 @@ class MainAssistant:
                 is_speaking = False
                 silence_chunks = 0
                 continue
+                
+            # KHÔNG THU ÂM TRONG KHI AI ĐANG NÓI (CHỐNG DỘI ÂM)
+            if hasattr(self, 'voice') and getattr(self.voice, 'is_speaking', False):
+                pre_audio.clear()
+                audio_buffer = []
+                is_speaking = False
+                silence_chunks = 0
+                continue
 
             audio_int16 = np.frombuffer(data, dtype=np.int16)
             audio_float32 = audio_int16.astype(np.float32) / 32768.0
@@ -358,6 +394,7 @@ class MainAssistant:
 
             if speech_prob > VAD_THRESHOLD:
                 if not is_speaking:
+                    print(f"\n[VAD] Đang nghe... (Tỉ lệ giọng nói: {speech_prob:.2f})")
                     audio_buffer.extend(list(pre_audio))
                 is_speaking = True
                 silence_chunks = 0
@@ -367,12 +404,24 @@ class MainAssistant:
                 audio_buffer.append(data)
 
                 if silence_chunks > max_silence_chunks:
-                    # Chốt câu và xử lý
                     full_audio = b"".join(audio_buffer)
                     audio_np = np.frombuffer(full_audio, dtype=np.int16).astype(np.float32) / 32768.0
                     
-                    # Gọi Voice Engine xử lý quy trình STT -> LLM -> TTS
-                    self.voice.process_voice_command(audio_np)
+                    if not self.is_session_active:
+                        # --- CHỜ WAKE WORD ---
+                        text = self.voice.transcribe(audio_np)
+                        logger.info(f"[WAKE LISTEN] \"{text}\"")
+                        if text and self.voice.check_wake_word(text):
+                            self._start_session()
+                    else:
+                        # --- TRONG PHIÊN: XỬ LÝ LỆNH ---
+                        result = self.voice.process_voice_command(audio_np)
+                        if result:
+                            command = result.get("command", "NONE")
+                            if command == "SESSION:END":
+                                self._end_session()
+                            else:
+                                self._handle_command(command)
                     
                     is_speaking = False
                     audio_buffer = []

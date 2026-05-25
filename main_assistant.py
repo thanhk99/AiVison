@@ -9,6 +9,7 @@ import torch
 from collections import deque
 
 from core.config_loader import load_config
+from core.mqtt_manager import MqttManager
 from engines.vision.vision_engine import VisionEngine
 from engines.vision.security_engine import SecurityEngine
 from engines.voice_engine import VoiceEngine
@@ -36,6 +37,10 @@ class MainAssistant:
         logger.info("[+] Khoi tao module Voice (STT/LLM/TTS)...")
         self.voice = VoiceEngine(self.config)
         
+        logger.info("[+] Khoi tao module MQTT...")
+        self.mqtt = MqttManager(self.config)
+        self.mqtt.connect()
+        
         logger.info("[+] Khoi tao module Vision (Gesture)...")
         self.vision = VisionEngine(config=self.config.get("vision", {}))
         
@@ -47,10 +52,11 @@ class MainAssistant:
                                                       trust_repo=True)
 
         # 3. State Management
-        self.is_unlocked = False
+        self.is_unlocked = True  # TẠM THỜI BỎ QUA XÁC THỰC, LUÔN MỞ KHÓA ĐỂ NGHE WAKE WORD
         self.current_user = "Unknown"
         self.is_running = False
         self.is_authenticating = False
+        self.is_session_active = False  # Trạng thái phiên hội thoại
         
         # Audio Stream
         self.p = pyaudio.PyAudio()
@@ -120,6 +126,19 @@ class MainAssistant:
         logger.info("<<< He thong da KHOA.")
         self.voice.speak("Tạm biệt bạn, tôi sẽ quay lại trạng thái chờ.")
 
+    def _start_session(self):
+        """Bắt đầu phiên giao tiếp sau khi nghe wake word."""
+        self.is_session_active = True
+        self.voice.llm.clear_history()  # Xóa lịch sử cũ
+        logger.info("[SESSION] Phiên giao tiếp bắt đầu.")
+        self.voice.speak("Dạ, tôi đang nghe. Bạn cần gì ạ?")
+
+    def _end_session(self):
+        """Kết thúc phiên giao tiếp."""
+        self.is_session_active = False
+        logger.info("[SESSION] Phiên giao tiếp kết thúc.")
+        self.voice.llm.clear_history()
+
     def _run_audio_loop(self):
         """Vòng lặp xử lý âm thanh thời gian thực."""
         self.stream = self.p.open(
@@ -163,24 +182,55 @@ class MainAssistant:
                 audio_buffer.append(data)
 
                 if silence_chunks > max_silence_chunks:
-                    # Chốt câu và xử lý
                     full_audio = b"".join(audio_buffer)
                     audio_np = np.frombuffer(full_audio, dtype=np.int16).astype(np.float32) / 32768.0
-                    
-                    # Gọi Voice Engine xử lý quy trình STT -> LLM -> TTS
-                    self.voice.process_voice_command(audio_np)
-                    
+
+                    if not self.is_session_active:
+                        # --- CHỜ WAKE WORD ---
+                        text = self.voice.transcribe(audio_np)
+                        logger.info(f"[WAKE LISTEN] \"{text}\"")
+                        if text and self.voice.check_wake_word(text):
+                            self._start_session()
+                    else:
+                        # --- TRONG PHIÊN: xử lý lệnh đầy đủ ---
+                        result = self.voice.process_voice_command(audio_np)
+                        if result:
+                            command = result.get("command", "NONE")
+                            if command == "SESSION:END":
+                                self._end_session()
+                            else:
+                                self._handle_command(command)
+
                     is_speaking = False
                     audio_buffer = []
+
                     silence_chunks = 0
                     pre_audio.clear()
             else:
                 pre_audio.append(data)
 
+    def _handle_command(self, command: str):
+        """Điều phối lệnh từ LLM tới IoT hoặc Software."""
+        if not command or command == "NONE":
+            return
+        
+        if command.startswith("IOT:"):
+            # Gửi lệnh tới thiết bị qua MQTT
+            logger.info(f"[CMD] Gửi IoT command: {command}")
+            self.mqtt.publish("iot", {"command": command})
+        elif command.startswith("SW:"):
+            # Điều khiển phần mềm (log + mở rộng sau)
+            logger.info(f"[CMD] Software command: {command}")
+            # TODO: tích hợp subprocess để mở app nếu cần
+        else:
+            logger.warning(f"[CMD] Lệnh không xác định: {command}")
+
     def stop(self):
         self.is_running = False
         if self.vision:
             self.vision.stop()
+        if hasattr(self, 'mqtt'):
+            self.mqtt.stop()
         if self.stream:
             self.stream.stop_stream()
             self.stream.close()

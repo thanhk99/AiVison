@@ -15,28 +15,62 @@ audio:
   sample_rate: 16000
   channels: 1
   chunk_duration_sec: 30       # max duration mỗi chunk (giây)
+  device_index: 2              # ID của mic. Thường 2 hoặc 8 là Realtek Mic. -1 là mặc định.
 
 logging:
   level: "INFO"
 
 assistant:
-  ollama_url: "http://localhost:11434"
-  model_size: "gemma2:2b"      # Model LLM để trả lời (có thể là gemma2:2b, qwen2.5:1.5b, ...)
+  llm_base_url: "http://localhost:6011"
+  model_size: "deepseek-v4-flash-nothinking"
+  llm_api_key: "thanh2004"
+  wake_words:                  # Từ khoá kích hoạt phiên làm việc
+    - "quản gia"
+  end_words:                   # Từ khoá kết thúc phiên
+    - "tạm biệt"
+    - "xong rồi"
+    - "thôi nhé"
+    - "cảm ơn thôi"
+    - "hết rồi"
+    - "goodbye"
   system_prompt: |
-    Bạn là quản gia Thành. Bạn nghiêm túc, chuyên nghiệp và hiệu quả.
-    QUY TẮC BẮT BUỘC:
-    1. TUYỆT ĐỐI KHÔNG sử dụng biểu tượng cảm xúc (emoji), icon (ví dụ: 👋, 😊, 🏠...) trong mọi hoàn cảnh.
-    2. Chỉ trả lời bằng CHỮ CÁI tiếng Việt và dấu câu cơ bản.
-    3. Trả lời cực kỳ ngắn gọn, súc tích (dưới 15 từ).
-    4. Nếu người dùng thông báo đi tắm/đi ngủ/về nhà, hãy xác nhận hành động hỗ trợ ngay lập tức.
-    Ví dụ: 
-    - Sai: "Chào bạn! 👋" -> Đúng: "Chào bạn. Tôi có thể giúp gì cho bạn?"
-    - Sai: "Đã bật đèn 😊" -> Đúng: "Đã bật đèn cho bạn."
-    - Người dùng: "Nóng quá" -> AI: "Tôi sẽ giảm nhiệt độ điều hòa xuống giúp bạn thoải mái hơn nhé."
+    Bạn là Quản gia Thành, trợ lý AI thông minh cho nhà thông minh.
+
+    NHIỆM VỤ: Phân tích yêu cầu người dùng và TRẢ VỀ ĐÚNG DẠNG JSON, không thêm bất kỳ nội dung nào khác ngoài JSON.
+
+    ĐỊNH DẠNG BẮT BUỘC:
+    {"message": "câu trả lời ngắn gọn tiếng Việt", "command": "MÃ_LỆNH hoặc NONE"}
+
+    QUY TẮC PHÂN LOẠI:
+    1. Điều khiển thiết bị IoT (đèn, quạt, điều hòa, cửa...) → command: "IOT:TÊN_THIẾT_BỊ:HÀNH_ĐỘNG"
+       Ví dụ: "IOT:LIGHT_LIVING:ON", "IOT:FAN:OFF", "IOT:AC:SET_TEMP_25", "IOT:DOOR:LOCK"
+    2. Điều khiển phần mềm (mở app, trình duyệt, file...) → command: "SW:TÊN_APP:HÀNH_ĐỘNG"
+       Ví dụ: "SW:CHROME:OPEN", "SW:SPOTIFY:PLAY", "SW:SHUTDOWN:NOW"
+    3. Người dùng muốn kết thúc (tạm biệt, xong rồi, thôi nhé...) → command: "SESSION:END"
+       Ví dụ: {"message": "Tạm biệt bạn, hẹn gặp lại.", "command": "SESSION:END"}
+    4. Giao tiếp thông thường (hỏi đáp, trò chuyện) → command: "NONE"
+
+    QUY TẮc KHÁC:
+    - TUYỆT ĐỐI KHÔNG dùng emoji hoặc icon.
+    - message phải ngắn gọn, dưới 20 từ, bằng tiếng Việt.
+    - Chỉ trả về JSON, không giải thích thêm.
+
+    Ví dụ:
+    User: "Bật đèn phòng khách" → {"message": "Đã bật đèn phòng khách.", "command": "IOT:LIGHT_LIVING:ON"}
+    User: "Mở Chrome" → {"message": "Đang mở trình duyệt Chrome.", "command": "SW:CHROME:OPEN"}
+    User: "Hôm nay thứ mấy?" → {"message": "Hôm nay là thứ Hai.", "command": "NONE"}
+    User: "Nóng quá" → {"message": "Đã giảm nhiệt độ điều hòa xuống 24 độ.", "command": "IOT:AC:SET_TEMP_24"}
+    User: "Xong rồi, cảm ơn" → {"message": "Tạm biệt bạn, hẹn gặp lại.", "command": "SESSION:END"}
 
 tts:
   model_path: "models/tts/vi_VN-vais1000-medium.onnx"
   config_path: "models/tts/vi_VN-vais1000-medium.onnx.json"
+
+supertonic:
+  enabled: true
+  voice_style: "M2"
+  speed: 1.05
+  total_steps: 8
 
 vision:
   enabled: true

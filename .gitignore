@@ -44,3 +44,4 @@ models/**/*.task
 models/**/*.onnx.json
 models/vision/faces/*
 !models/vision/faces/.gitkeep
+models/supertonic/
