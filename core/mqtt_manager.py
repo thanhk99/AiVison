@@ -4,6 +4,11 @@ import json
 import threading
 import time
 
+import asyncio
+
+from services.state_service import home_state
+from server.dashboard_ws import dashboard_manager
+
 logger = logging.getLogger("MqttManager")
 
 class MqttManager:
@@ -57,7 +62,17 @@ class MqttManager:
             self.client.subscribe(command_topic)
             logger.info(f"Subscribed to topic: {command_topic}")
             
+            sensor_topic = self.topics.get("sensor")
+
+            if sensor_topic:
+                self.client.subscribe(sensor_topic)
+
+            device_status_topic = self.topics.get("device_status")
+            
             # Publish initial status
+            if device_status_topic:
+                self.client.subscribe(device_status_topic)
+            
             self.publish_status({"state": "online", "message": "Quản gia đã sẵn sàng"})
         else:
             logger.error(f"Connection failed with code {rc}")
@@ -81,6 +96,56 @@ class MqttManager:
                 if self.command_callback:
                     # Chạy callback trong thread riêng để không block loop của MQTT
                     threading.Thread(target=self.command_callback, args=(data,), daemon=True).start()
+                return
+            
+            # ==========================================
+            # Sensor Data
+            # Topic: home/sensor
+            # ==========================================
+            
+            if msg.topic == self.topics.get("sensor"):
+                temperature = data.get("temperature",0)
+                humidity = data.get("humidity",0)
+                
+                home_state.update_sensor(temperature,humidity)
+                
+                self._broadcast_dashboard(
+                    {
+                        "type": "sensor_update",
+                        "temperature": temperature,
+                        "humidity": humidity
+                    }
+                )
+                return            
+            
+            #==========================================
+            # Device Status
+            # Topic: home/device/status
+            # ==========================================
+            
+            if msg.topic == self.topics.get("device_status"):
+                device = data.get("device")
+                status = data.get("status")
+                if device is not None:
+                # cập nhật state
+                    home_state.update_device(device,status)
+
+                # realtime dashboard
+                self._broadcast_dashboard(
+                    {
+                        "type": "device_update",
+                        "device": device,
+                        "status": status
+                    }
+                )
+
+                logger.info(
+                    f"Device updated: "
+                    f"{device} -> {status}"
+                )
+
+            return
+            
         except Exception as e:
             logger.error(f"Error processing MQTT message: {e}")
 
@@ -126,3 +191,9 @@ class MqttManager:
             self.client.loop_stop()
             self.client.disconnect()
             logger.info("MQTT connection stopped.")
+            
+    def _broadcast_dashboard(self, payload):
+        try:
+            asyncio.run(dashboard_manager.broadcast(payload))
+        except Exception as e:
+            logger.error(f"Dashboard broadcast error: {e}")

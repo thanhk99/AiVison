@@ -8,11 +8,14 @@ import yaml
 from fastapi import FastAPI, File, HTTPException, UploadFile, WebSocket, Query
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
+from fastapi.staticfiles import StaticFiles
 
 from core.config_loader import load_config
 from engines.stt.audio_processor import convert_to_wav
 from engines.stt.whisper_engine import WhisperEngine
 from .ws_handler import stream_transcribe
+from api.dashboard import router as dashboard_router
+from api.devices import router as devices_router
 
 # ─── Logger ───────────────────────────────────────────────────────────────────
 logging.basicConfig(
@@ -58,6 +61,15 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+# Include routers
+app.include_router(dashboard_router)
+app.include_router(devices_router)
+
+# Mount static files (cho dashboard frontend)
+static_dir = Path(__file__).parent / "static"
+static_dir.mkdir(exist_ok=True)
+app.mount("/static", StaticFiles(directory=str(static_dir)), name="static")
 
 
 # ─── Endpoints ────────────────────────────────────────────────────────────────

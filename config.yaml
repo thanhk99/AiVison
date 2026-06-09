@@ -22,6 +22,7 @@ logging:
 
 assistant:
   llm_base_url: "http://localhost:6011"
+  # llm_base_url: "https://ds2api-thanh.vercel.app"
   model_size: "deepseek-v4-flash-nothinking"
   llm_api_key: "thanh2004"
   wake_words:                  # Từ khoá kích hoạt phiên làm việc
@@ -95,4 +96,7 @@ mqtt:
     status: "home/assistant/status"
     event: "home/assistant/event"
     iot: "home/assistant/control"
+
+    sensor: "home/sensor"
+    device_status: "home/device/status"
 
