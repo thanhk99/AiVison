@@ -108,6 +108,7 @@ class MqttManager:
                 humidity = data.get("humidity",0)
                 
                 home_state.update_sensor(temperature,humidity)
+                logger.info(f"[STATE] Temp={temperature} Hum={humidity}")
                 
                 self._broadcast_dashboard(
                     {
@@ -167,7 +168,7 @@ class MqttManager:
             if isinstance(payload, (dict, list)):
                 payload = json.dumps(payload, ensure_ascii=False)
             
-            # print(f"[MQTT SEND] Topic: {topic} | Payload: {payload}")
+            logger.info(f"[MQTT SEND] topic={topic} payload={payload}")
             self.client.publish(topic, payload, qos=1)
             # logger.debug(f"Published to {topic}: {payload}")
         except Exception as e:

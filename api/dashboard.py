@@ -13,7 +13,6 @@ router = APIRouter(
 
 @router.get("")
 def get_dashboard():
-
     return home_state.get_state()
 
 
