@@ -1,38 +1,34 @@
-import requests
 import json
 import logging
+import os
+from dotenv import load_dotenv
+from openai import OpenAI
+
+load_dotenv()  # Nạp các biến môi trường từ file .env
 
 logger = logging.getLogger("LLMEngine")
 
 class LLMEngine:
-    def __init__(self, base_url="http://localhost:6011", model="deepseek-v4-flash-nothinking", api_key="thanh2004"):
+    def __init__(self, base_url="https://api.deepseek.com", model="deepseek-chat", api_key=None):
         """
-        Khởi tạo kết nối tới ds2api (OpenAI compatible API).
+        Khởi tạo kết nối tới DeepSeek API (hoặc OpenAI compatible API) sử dụng thư viện OpenAI SDK.
         """
-        # Endpoint chuẩn của OpenAI compatible
-        self.base_url = f"{base_url.rstrip('/')}/v1/chat/completions"
+        # Nếu không truyền api_key hoặc truyền giá trị mặc định của config, lấy từ file .env
+        if not api_key or api_key == "YOUR_DEEPSEEK_API_KEY" or api_key == "thanh2004":
+            api_key = os.getenv("API_KEY")
+            
+        self.client = OpenAI(
+            api_key=api_key,
+            base_url=base_url
+        )
         self.model = model
-        self.api_key = api_key
         self.system_prompt = ""
         self.history = []  # Lịch sử hội thoại
         self.max_history = 10  # Tối đa 5 cặp
 
-    def _build_payload(self, stream: bool) -> dict:
-        """Tạo payload gửi tới API, bao gồm lịch sử và system prompt."""
-        messages = [{"role": "system", "content": self.system_prompt}] + self.history
-        return {
-            "model": self.model,
-            "messages": messages,
-            "stream": stream,
-            "response_format": {"type": "json_object"},  # Yêu cầu trả về JSON
-            "temperature": 0.1  # Thấp để AI tuân thủ định dạng
-        }
-
-    def _get_headers(self) -> dict:
-        return {
-            "Content-Type": "application/json",
-            "Authorization": f"Bearer {self.api_key}"
-        }
+    def _build_messages(self) -> list:
+        """Tạo danh sách messages gửi tới API, bao gồm lịch sử và system prompt."""
+        return [{"role": "system", "content": self.system_prompt}] + self.history
 
     def generate_response_full(self, user_input: str) -> str:
         """
@@ -40,13 +36,21 @@ class LLMEngine:
         Phù hợp để parse JSON sau đó.
         """
         self.history.append({"role": "user", "content": user_input})
-        payload = self._build_payload(stream=False)
+        messages = self._build_messages()
+        
+        # Log ra câu hỏi đang chuẩn bị gửi cho AI
+        logger.info(f"[LLM] Đang gửi câu hỏi lên AI: {user_input}")
 
         try:
-            response = requests.post(self.base_url, headers=self._get_headers(), json=payload, timeout=30)
-            response.raise_for_status()
-            data = response.json()
-            full_response = data.get("choices", [{}])[0].get("message", {}).get("content", "").strip()
+            response = self.client.chat.completions.create(
+                model=self.model,
+                messages=messages,
+                stream=False,
+                response_format={"type": "json_object"},
+                temperature=0.1
+            )
+            
+            full_response = response.choices[0].message.content.strip()
 
             # Lưu lại lịch sử
             self.history.append({"role": "assistant", "content": full_response})
@@ -67,27 +71,23 @@ class LLMEngine:
         Dùng cho các trường hợp cần phản hồi nhanh (không cần parse JSON).
         """
         self.history.append({"role": "user", "content": user_input})
-        payload = self._build_payload(stream=True)
+        messages = self._build_messages()
 
         full_response = ""
         try:
-            response = requests.post(self.base_url, headers=self._get_headers(), json=payload, stream=True, timeout=30)
-            response.raise_for_status()
+            response = self.client.chat.completions.create(
+                model=self.model,
+                messages=messages,
+                stream=True,
+                response_format={"type": "json_object"},
+                temperature=0.1
+            )
 
-            for line in response.iter_lines():
-                if line:
-                    decoded = line.decode('utf-8').strip()
-                    if decoded.startswith("data: "):
-                        decoded = decoded[6:]
-                    if decoded == "[DONE]":
-                        break
-                    if decoded:
-                        chunk = json.loads(decoded)
-                        delta = chunk.get("choices", [{}])[0].get("delta", {})
-                        content = delta.get("content", "")
-                        if content:
-                            full_response += content
-                            yield content
+            for chunk in response:
+                content = chunk.choices[0].delta.content
+                if content:
+                    full_response += content
+                    yield content
 
             # Lưu lại lịch sử
             self.history.append({"role": "assistant", "content": full_response})

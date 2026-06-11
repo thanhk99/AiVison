@@ -37,6 +37,7 @@ logs/
 *.log
 pip_log.txt
 config_local.yaml
+.env
 
 # AI Models & Data (Ignore heavy model files)
 models/**/*.onnx

@@ -23,8 +23,7 @@ class VoiceEngine:
         llm_conf = config.get("assistant", {})
         self.llm = LLMEngine(
             base_url=llm_conf.get("llm_base_url", "http://localhost:6011"),
-            model=llm_conf.get("model_size", "deepseek-v4-flash-nothinking"),
-            api_key=llm_conf.get("llm_api_key", "thanh2004")
+            model=llm_conf.get("model_size", "deepseek-v4-flash-nothinking")
         )
         self.llm.system_prompt = llm_conf.get("system_prompt", "")
 

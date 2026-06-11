@@ -22,9 +22,8 @@ logging:
 
 assistant:
   # llm_base_url: "http://localhost:6011"
-  llm_base_url: "https://ds2api-thanh.vercel.app"
-  model_size: "deepseek-v4-flash-nothinking"
-  llm_api_key: "thanh2004"
+  llm_base_url: "https://api.deepseek.com"
+  model_size: "deepseek-chat"
   wake_words:                  # Từ khoá kích hoạt phiên làm việc
     - "quản gia"
   end_words:                   # Từ khoá kết thúc phiên
