@@ -15,13 +15,20 @@ def control_light(status: bool):
     # Import module server.main lazily to avoid circular import at module import time
     import server.main as main_server
 
-    if getattr(main_server, "mqtt", None) is None:
+    if (
+        main_server.assistant is None
+        or main_server.assistant.mqtt is None
+    ):
         raise HTTPException(
             status_code=503,
             detail="Assistant chưa kết nối"
         )
 
-    main_server.mqtt.publish(
+    print("==== API LIGHT ====")
+    print(main_server.assistant)
+    print(main_server.assistant.mqtt)
+
+    main_server.assistant.mqtt.publish(
         "iot",
         {
             "device": "LIGHT_LIVING",
@@ -38,4 +45,16 @@ def control_light(status: bool):
     return {
         "success": True,
         "status": status
+    }
+    
+@router.get("/debug")
+def debug():
+    import server.main as main_server
+
+    return {
+        "assistant": str(main_server.assistant),
+        "has_mqtt": (
+            main_server.assistant is not None
+            and getattr(main_server.assistant, "mqtt", None) is not None
+        )
     }
